@@ -1,16 +1,16 @@
-const keys = require("./keys");
+const keys = require('./keys');
 
-// Express App set up
-const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
+// Express App Setup
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 
 const app = express();
-app.use(cors()); // allow us to make a request from one domain (react app) to a completly different domain (port) our server is running on
-app.use(bodyParser.json()); // Convert the body of the post request into a json object
+app.use(cors());
+app.use(bodyParser.json());
 
-// Set up and connect to PG server
-const { Pool } = require("pg");
+// Postgres Client Setup
+const { Pool } = require('pg');
 const pgClient = new Pool({
   user: keys.pgUser,
   host: keys.pgHost,
@@ -18,19 +18,14 @@ const pgClient = new Pool({
   password: keys.pgPassword,
   port: keys.pgPort
 });
+pgClient.on('error', () => console.log('Lost PG connection'));
 
-// Error handling
-pgClient.on("error", () => console.log("Lost PG connection"));
-
-// Table that is going to store all of the values using ids
-// Going to create a table called values
-// Number is going to be the column that is created and is going to be the value that was submitted
 pgClient
-  .query("CREATE TABLE IF NOT EXISTS values (number INT)")
+  .query('CREATE TABLE IF NOT EXISTS values (number INT)')
   .catch(err => console.log(err));
 
-// Set up Redis
-const redis = require("redis");
+// Redis Client Setup
+const redis = require('redis');
 const redisClient = redis.createClient({
   host: keys.redisHost,
   port: keys.redisPort,
@@ -39,49 +34,37 @@ const redisClient = redis.createClient({
 const redisPublisher = redisClient.duplicate();
 
 // Express route handlers
-app.get("/", (req, res) => {
-  res.send("hi");
+
+app.get('/', (req, res) => {
+  res.send('Hi');
 });
 
-// This url will query our running PG instance and retrieve all values in the DB
-app.get("/values/all", async (req, res) => {
-  // Look at the values tables and get all the queries
-  const values = await pgClient.query("SELECT * from values");
+app.get('/values/all', async (req, res) => {
+  const values = await pgClient.query('SELECT * from values');
 
-  // Sending the information back and the .rows ensures we get only the values
   res.send(values.rows);
 });
 
-// This url will query all of the different values and indicies that have ever been submitted to our back end
-app.get("/values/current", async (req, res) => {
-  // Look at the hash "values" and return all info
-  redisClient.hgetall("values", (err, values) => {
+app.get('/values/current', async (req, res) => {
+  redisClient.hgetall('values', (err, values) => {
     res.send(values);
   });
 });
 
-// Recieve new values from our react app
-app.post("/values", async (req, res) => {
-  const index = req.body.value;
+app.post('/values', async (req, res) => {
+  const index = req.body.index;
 
   if (parseInt(index) > 40) {
-    return res.status(422).send("Index is too high");
+    return res.status(422).send('Index too high');
   }
 
-  // Nothing yet! indicates we have not yet calculated a value for the given index
-  redisClient.hset("values", index, "Nothing yet!");
+  redisClient.hset('values', index, 'Nothing yet!');
+  redisPublisher.publish('insert', index);
+  pgClient.query('INSERT INTO values(number) VALUES($1)', [index]);
 
-  // Start calculating the value given the index
-  redisPublisher.publish("insert", index);
-
-  // Look at pg client and add in the new index that was submitted
-  pgClient.query("INSERT INTO values(number VALUES($1)", [index]);
-
-  // Doing some work to calculate value
   res.send({ working: true });
 });
 
-// Port
-app.listen(5000, error => {
-  console.log("Listening to port 5000");
+app.listen(5000, err => {
+  console.log('Listening');
 });
