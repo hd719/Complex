@@ -1,0 +1,23 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  - docker build -t hd719/react-test -f ./client/Dockerfile.dev ./client
+  # - docker build myotherproject (worker or server)
+
+script:
+  - docker run -e CI=true hd719/react-test yarn test
+
+after_success:
+  - docker build -t hd719/complex-client ./client
+  - docker build -t hd719/complex-nginx ./nginx
+  - docker build -t hd719/complex-server ./server
+  - docker build -t hd719/complex-worker ./worker
+  # Login to the docker cli
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # take these images and push them up to Docker Hub
+  - docker push hd719/complex-client
+  - docker push hd719/complex-nginx
+  - docker push hd719/complex-server
+  - docker push hd719/complex-worker
