@@ -6,7 +6,7 @@ before_install:
   - docker build -t hd719/react-test -f ./client/Dockerfile.dev ./client
 
 script:
-  - docker run hd719/react-test yarn test -- --coverage
+  - docker run hd719/react-test npm run test -- --coverage
 
 after_success:
   - docker build -t hd719/complex-client ./client
