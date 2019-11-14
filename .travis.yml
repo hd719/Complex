@@ -4,7 +4,6 @@ services:
 
 before_install:
   - docker build -t hd719/react-test -f ./client/Dockerfile.dev ./client
-  # - docker build myotherproject (worker or server)
 
 script:
   - docker run -e CI=true hd719/react-test yarn test
